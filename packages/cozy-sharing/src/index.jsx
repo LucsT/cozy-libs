@@ -173,16 +173,30 @@ class SharingProvider extends Component {
 
   shareByLink = async document => {
     const { documentType } = this.state
-    // Notes should be shared with write permissions
-    // so that the recipient may edit the content of the note
-    const options =
-      documentType === 'Notes' ? { verbs: ['GET', 'POST', 'PUT', 'PATCH'] } : {}
+
     trackSharingByLink(document)
-    const resp = await this.props.client
-      .collection('io.cozy.permissions')
-      .createSharingLink(document, options)
-    this.dispatch(addSharingLink(resp.data))
-    return resp
+    if (documentType === 'Notes') {
+      // Notes should be shared with write permissions
+      // and should also allow for realtime events
+      const documents = {
+        note: [document, { verbs: ['GET', 'POST', 'PUT', 'PATCH'] }],
+        note_events: [
+          { _type: 'io.cozy.notes.events', _id: document._id },
+          { verbs: ['ALL'] }
+        ]
+      }
+      const resp = await this.props.client
+        .collection('io.cozy.permissions')
+        .createCompositeSharingLink(documents)
+      this.dispatch(addSharingLink(resp.data))
+      return resp
+    } else {
+      const resp = await this.props.client
+        .collection('io.cozy.permissions')
+        .createSharingLink(document)
+      this.dispatch(addSharingLink(resp.data))
+      return resp
+    }
   }
 
   revokeSharingLink = async document => {
